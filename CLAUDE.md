@@ -13,14 +13,40 @@ npx tsc --noEmit # TypeScript-Check ohne Build
 
 ## Architecture
 
-**Stack:** React 18 + Vite 5 + TypeScript (strict) + Tailwind CSS v3. Keine externen Runtime-Libraries — nur Browser-native APIs (`fetch`, `FormData`, `URL.createObjectURL`, `AbortController`).
+**Stack:** React 18.3 + Vite 5.4 + TypeScript 5.6 (strict) + Tailwind CSS v3.4. Keine externen Runtime-Libraries — nur Browser-native APIs (`fetch`, `FormData`, `URL.createObjectURL`, `AbortController`).
+
+**Verzeichnisstruktur:**
+```
+src/
+  main.tsx              # Entry point — mountet App in StrictMode
+  App.tsx               # Root-Komponente — Layout only, alle State aus useTryOn()
+  index.css             # Tailwind-Direktiven + Body-Styles (slate-950 Hintergrund)
+  types/
+    index.ts            # Shared types: UploadSlot, AppStatus, UploadedImage
+  hooks/
+    useTryOn.ts         # Master-State-Hook — orchestriert Uploads + API-Aufruf
+    useImageUpload.ts   # Einzelner Upload-Slot — Validierung, Preview-URL, Cleanup
+  services/
+    webhookService.ts   # submitTryOn() — FormData bauen, fetch, Response-URL zurückgeben
+  utils/
+    responseParser.ts   # parseWebhookResponse() — binary/JSON/Base64-Responses
+    fileValidation.ts   # validateImageFile() + formatFileSize() — Typ/Größe-Prüfung
+  components/
+    UploadCard.tsx      # Drop-Zone mit Drag-and-Drop, Datei-Input, Fehleranzeige
+    ImagePreview.tsx    # Vorschau-Bild mit Entfernen-Button (×)
+    GenerateButton.tsx  # CTA-Button — idle/loading/disabled-Zustände
+    LoadingOverlay.tsx  # Vollbild-Spinner mit backdrop-blur während der Generierung
+    ResultDisplay.tsx   # Ergebnisbild + Download-Link
+    ErrorBanner.tsx     # Rote, schließbare Fehlerleiste
+```
 
 **Datenfluss:** `App.tsx` → `useTryOn()` → `useImageUpload()` (×2) + `webhookService.ts`
 
 - `useTryOn` ist die einzige State-Quelle. Alle Komponenten erhalten State und Callbacks als Props — kein globaler State.
-- `useImageUpload` verwaltet einen einzelnen Upload-Slot: Datei-Validierung, Preview-URL (Object URL) und Cleanup via `URL.revokeObjectURL`.
+- `useImageUpload` verwaltet einen einzelnen Upload-Slot: Datei-Validierung (via `fileValidation.ts`), Preview-URL (Object URL) und Cleanup via `URL.revokeObjectURL`.
 - `webhookService.ts` baut `FormData` mit Feldern `image1`/`image2` und sendet `POST` an `VITE_WEBHOOK_URL`.
-- `responseParser.ts` brancht nach `Content-Type`: `image/*` → Blob-URL, `application/json` → sucht `.url`/`.imageUrl` oder Base64-Felder.
+- `responseParser.ts` (in `src/utils/`) brancht nach `Content-Type`: `image/*` → Blob-URL, `application/json` → sucht `.url`/`.imageUrl` oder Base64-Felder.
+- `fileValidation.ts` erlaubt JPEG/PNG/WebP, max. 10 MB.
 
 ## CORS
 
